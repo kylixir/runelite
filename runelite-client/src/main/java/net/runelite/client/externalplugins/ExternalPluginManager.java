@@ -33,17 +33,22 @@ import com.google.common.hash.HashingInputStream;
 import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.RuneLite;
 import net.runelite.client.RuneLiteProperties;
@@ -61,8 +66,8 @@ import net.runelite.client.ui.SplashScreen;
 import net.runelite.client.util.CountingInputStream;
 import net.runelite.client.util.Text;
 import net.runelite.client.util.VerificationException;
-import net.runelite.http.api.RuneLiteAPI;
 import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
@@ -74,19 +79,36 @@ public class ExternalPluginManager
 	private static Class<? extends Plugin>[] builtinExternals = null;
 
 	@Inject
-	private ConfigManager configManager;
+	@Named("safeMode")
+	private boolean safeMode;
+
+	private final ConfigManager configManager;
+	private final ExternalPluginClient externalPluginClient;
+	private final ScheduledExecutorService executor;
+	private final PluginManager pluginManager;
+	private final EventBus eventBus;
+	private final OkHttpClient okHttpClient;
 
 	@Inject
-	private ExternalPluginClient externalPluginClient;
+	private ExternalPluginManager(
+		ConfigManager configManager,
+		ExternalPluginClient externalPluginClient,
+		ScheduledExecutorService executor,
+		PluginManager pluginManager,
+		EventBus eventBus,
+		OkHttpClient okHttpClient
+	)
+	{
+		this.configManager = configManager;
+		this.externalPluginClient = externalPluginClient;
+		this.executor = executor;
+		this.pluginManager = pluginManager;
+		this.eventBus = eventBus;
+		this.okHttpClient = okHttpClient;
 
-	@Inject
-	private PluginManager pluginManager;
-
-	@Inject
-	private ScheduledExecutorService executor;
-
-	@Inject
-	private EventBus eventBus;
+		executor.scheduleWithFixedDelay(() -> externalPluginClient.submitPlugins(getInstalledExternalPlugins()),
+			new Random().nextInt(60), 180, TimeUnit.MINUTES);
+	}
 
 	public void loadExternalPlugins() throws PluginInstantiationException
 	{
@@ -113,6 +135,12 @@ public class ExternalPluginManager
 
 	private void refreshPlugins()
 	{
+		if (safeMode)
+		{
+			log.debug("External plugins are disabled in safe mode!");
+			return;
+		}
+
 		Multimap<ExternalPluginManifest, Plugin> loadedExternalPlugins = HashMultimap.create();
 		for (Plugin p : pluginManager.getPlugins())
 		{
@@ -195,7 +223,7 @@ public class ExternalPluginManager
 						.addPathSegment(manifest.getCommit() + ".jar")
 						.build();
 
-					try (Response res = RuneLiteAPI.CLIENT.newCall(new Request.Builder().url(url).build()).execute())
+					try (Response res = okHttpClient.newCall(new Request.Builder().url(url).build()).execute())
 					{
 						int fdownloaded = downloaded;
 						downloaded += manifest.getSize();
@@ -242,9 +270,19 @@ public class ExternalPluginManager
 				log.info("Stopping external plugin \"{}\"", p.getClass());
 				try
 				{
-					pluginManager.stopPlugin(p);
+					SwingUtilities.invokeAndWait(() ->
+					{
+						try
+						{
+							pluginManager.stopPlugin(p);
+						}
+						catch (Exception e)
+						{
+							throw new RuntimeException(e);
+						}
+					});
 				}
-				catch (PluginInstantiationException e)
+				catch (InterruptedException | InvocationTargetException e)
 				{
 					log.warn("Unable to stop external plugin \"{}\"", p.getClass().getName(), e);
 				}
@@ -272,18 +310,32 @@ public class ExternalPluginManager
 						clazzes.add(cl.loadClass(className));
 					}
 
-					newPlugins = pluginManager.loadPlugins(clazzes, null);
+					List<Plugin> newPlugins2 = newPlugins = pluginManager.loadPlugins(clazzes, null);
 					if (!startup)
 					{
 						pluginManager.loadDefaultPluginConfiguration(newPlugins);
 
-						for (Plugin p : newPlugins)
+						SwingUtilities.invokeAndWait(() ->
 						{
-							pluginManager.startPlugin(p);
-						}
+							try
+							{
+								for (Plugin p : newPlugins2)
+								{
+									pluginManager.startPlugin(p);
+								}
+							}
+							catch (PluginInstantiationException e)
+							{
+								throw new RuntimeException(e);
+							}
+						});
 					}
 				}
-				catch (Exception e)
+				catch (ThreadDeath e)
+				{
+					throw e;
+				}
+				catch (Throwable e)
 				{
 					log.warn("Unable to start or load external plugin \"{}\"", manifest.getInternalName(), e);
 					if (newPlugins != null)
@@ -292,10 +344,21 @@ public class ExternalPluginManager
 						{
 							try
 							{
-								pluginManager.stopPlugin(p);
+								SwingUtilities.invokeAndWait(() ->
+								{
+									try
+									{
+										pluginManager.stopPlugin(p);
+									}
+									catch (Exception e2)
+									{
+										throw new RuntimeException(e2);
+									}
+								});
 							}
-							catch (Exception inner)
+							catch (InterruptedException | InvocationTargetException e2)
 							{
+								log.info("Unable to fully stop plugin \"{}\"", manifest.getInternalName(), e2);
 							}
 							pluginManager.remove(p);
 						}

@@ -62,6 +62,8 @@ class SlayerOverlay extends WidgetItemOverlay
 		ItemID.RED_SLAYER_HELMET_I,
 		ItemID.TURQUOISE_SLAYER_HELMET,
 		ItemID.TURQUOISE_SLAYER_HELMET_I,
+		ItemID.TWISTED_SLAYER_HELMET,
+		ItemID.TWISTED_SLAYER_HELMET_I,
 		ItemID.HYDRA_SLAYER_HELMET,
 		ItemID.HYDRA_SLAYER_HELMET_I,
 		ItemID.SLAYER_RING_ETERNAL,
@@ -92,7 +94,7 @@ class SlayerOverlay extends WidgetItemOverlay
 	}
 
 	@Override
-	public void renderItemOverlay(Graphics2D graphics, int itemId, WidgetItem itemWidget)
+	public void renderItemOverlay(Graphics2D graphics, int itemId, WidgetItem widgetItem)
 	{
 		if (!ALL_SLAYER_ITEMS.contains(itemId))
 		{
@@ -115,7 +117,7 @@ class SlayerOverlay extends WidgetItemOverlay
 
 		graphics.setFont(FontManager.getRunescapeSmallFont());
 
-		final Rectangle bounds = itemWidget.getCanvasBounds();
+		final Rectangle bounds = widgetItem.getCanvasBounds();
 		final TextComponent textComponent = new TextComponent();
 
 		switch (itemId)

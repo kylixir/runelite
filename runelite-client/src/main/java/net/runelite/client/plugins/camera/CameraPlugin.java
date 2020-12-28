@@ -37,11 +37,20 @@ import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.ScriptID;
+import net.runelite.api.SettingID;
+import net.runelite.api.VarClientInt;
 import net.runelite.api.VarPlayer;
+import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.FocusChanged;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.ScriptCallbackEvent;
+import net.runelite.api.events.ScriptPreFired;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.widgets.JavaScriptCallback;
+import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetID;
+import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -52,6 +61,8 @@ import net.runelite.client.input.MouseListener;
 import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.overlay.tooltip.Tooltip;
+import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 
 @PluginDescriptor(
 	name = "Camera",
@@ -62,6 +73,9 @@ import net.runelite.client.plugins.PluginDescriptor;
 public class CameraPlugin extends Plugin implements KeyListener, MouseListener
 {
 	private static final int DEFAULT_ZOOM_INCREMENT = 25;
+	private static final int DEFAULT_OUTER_ZOOM_LIMIT = 128;
+	static final int DEFAULT_INNER_ZOOM_LIMIT = 896;
+
 	private static final String LOOK_NORTH = "Look North";
 	private static final String LOOK_SOUTH = "Look South";
 	private static final String LOOK_EAST = "Look East";
@@ -91,6 +105,11 @@ public class CameraPlugin extends Plugin implements KeyListener, MouseListener
 	@Inject
 	private MouseManager mouseManager;
 
+	@Inject
+	private TooltipManager tooltipManager;
+
+	private Tooltip sliderTooltip;
+
 	@Provides
 	CameraConfig getConfig(ConfigManager configManager)
 	{
@@ -103,18 +122,60 @@ public class CameraPlugin extends Plugin implements KeyListener, MouseListener
 		rightClick = false;
 		middleClick = false;
 		menuHasEntries = false;
-		client.setCameraPitchRelaxerEnabled(config.relaxCameraPitch());
+		copyConfigs();
 		keyManager.registerKeyListener(this);
 		mouseManager.registerMouseListener(this);
+		clientThread.invoke(() ->
+		{
+			Widget sideSlider = client.getWidget(WidgetInfo.SETTINGS_SIDE_CAMERA_ZOOM_SLIDER_TRACK);
+			if (sideSlider != null)
+			{
+				addZoomTooltip(sideSlider);
+			}
+
+			Widget settingsInit = client.getWidget(WidgetInfo.SETTINGS_INIT);
+			if (settingsInit != null)
+			{
+				client.createScriptEvent(settingsInit.getOnLoadListener())
+					.setSource(settingsInit)
+					.run();
+			}
+		});
 	}
 
 	@Override
 	protected void shutDown()
 	{
 		client.setCameraPitchRelaxerEnabled(false);
+		client.setInvertYaw(false);
+		client.setInvertPitch(false);
 		keyManager.unregisterKeyListener(this);
 		mouseManager.unregisterMouseListener(this);
 		controlDown = false;
+
+		clientThread.invoke(() ->
+		{
+			Widget sideSlider = client.getWidget(WidgetInfo.SETTINGS_SIDE_CAMERA_ZOOM_SLIDER_TRACK);
+			if (sideSlider != null)
+			{
+				sideSlider.setOnMouseRepeatListener((Object[]) null);
+			}
+
+			Widget settingsInit = client.getWidget(WidgetInfo.SETTINGS_INIT);
+			if (settingsInit != null)
+			{
+				client.createScriptEvent(settingsInit.getOnLoadListener())
+					.setSource(settingsInit)
+					.run();
+			}
+		});
+	}
+
+	void copyConfigs()
+	{
+		client.setCameraPitchRelaxerEnabled(config.relaxCameraPitch());
+		client.setInvertYaw(config.invertYaw());
+		client.setInvertPitch(config.invertPitch());
 	}
 
 	@Subscribe
@@ -177,7 +238,7 @@ public class CameraPlugin extends Plugin implements KeyListener, MouseListener
 		if ("outerZoomLimit".equals(event.getEventName()))
 		{
 			int outerLimit = Ints.constrainToRange(config.outerLimit(), CameraConfig.OUTER_LIMIT_MIN, CameraConfig.OUTER_LIMIT_MAX);
-			int outerZoomLimit = 128 - outerLimit;
+			int outerZoomLimit = DEFAULT_OUTER_ZOOM_LIMIT - outerLimit;
 			intStack[intStackSize - 1] = outerZoomLimit;
 			return;
 		}
@@ -226,7 +287,7 @@ public class CameraPlugin extends Plugin implements KeyListener, MouseListener
 	@Subscribe
 	public void onConfigChanged(ConfigChanged ev)
 	{
-		client.setCameraPitchRelaxerEnabled(config.relaxCameraPitch());
+		copyConfigs();
 	}
 
 	@Override
@@ -295,6 +356,50 @@ public class CameraPlugin extends Plugin implements KeyListener, MouseListener
 	public void onClientTick(ClientTick event)
 	{
 		menuHasEntries = hasMenuEntries(client.getMenuEntries());
+	}
+
+	@Subscribe
+	private void onScriptPreFired(ScriptPreFired ev)
+	{
+		if (ev.getScriptId() == ScriptID.SETTINGS_SLIDER_CHOOSE_ONOP)
+		{
+			int arg = client.getIntStackSize() - 7;
+			int[] is = client.getIntStack();
+
+			if (is[arg] == SettingID.CAMERA_ZOOM)
+			{
+				addZoomTooltip(client.getScriptActiveWidget());
+			}
+		}
+	}
+
+	@Subscribe
+	private void onWidgetLoaded(WidgetLoaded ev)
+	{
+		if (ev.getGroupId() == WidgetID.SETTINGS_SIDE_GROUP_ID)
+		{
+			addZoomTooltip(client.getWidget(WidgetInfo.SETTINGS_SIDE_CAMERA_ZOOM_SLIDER_TRACK));
+		}
+	}
+
+	private void addZoomTooltip(Widget w)
+	{
+		w.setOnMouseRepeatListener((JavaScriptCallback) ev ->
+		{
+			int value = client.getVar(VarClientInt.CAMERA_ZOOM_RESIZABLE_VIEWPORT);
+			int max = config.innerLimit() ? config.INNER_ZOOM_LIMIT : CameraPlugin.DEFAULT_INNER_ZOOM_LIMIT;
+			sliderTooltip = new Tooltip("Camera Zoom: " + value + " / " + max);
+		});
+	}
+
+	@Subscribe
+	private void onBeforeRender(BeforeRender ev)
+	{
+		if (sliderTooltip != null)
+		{
+			tooltipManager.add(sliderTooltip);
+			sliderTooltip = null;
+		}
 	}
 
 	/**

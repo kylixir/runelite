@@ -113,7 +113,11 @@ public class OpponentInfoPlugin extends Plugin
 		}
 
 		final EnumSet<WorldType> worldType = client.getWorldType();
-		if (worldType.contains(WorldType.DEADMAN))
+		if (worldType.contains(WorldType.DEADMAN_TOURNAMENT))
+		{
+			hiscoreEndpoint = HiscoreEndpoint.TOURNAMENT;
+		}
+		else if (worldType.contains(WorldType.DEADMAN))
 		{
 			hiscoreEndpoint = HiscoreEndpoint.DEADMAN;
 		}
@@ -180,7 +184,7 @@ public class OpponentInfoPlugin extends Plugin
 		if (npc.getInteracting() == client.getLocalPlayer() || lastOpponent == npc)
 		{
 			MenuEntry[] menuEntries = client.getMenuEntries();
-			menuEntries[menuEntries.length - 1].setTarget("*" + menuEntryAdded.getTarget());
+			menuEntries[menuEntries.length - 1].setTarget("*" + menuEntries[menuEntries.length - 1].getTarget());
 			client.setMenuEntries(menuEntries);
 		}
 	}

@@ -43,6 +43,7 @@ import lombok.Getter;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.http.api.worlds.World;
+import net.runelite.http.api.worlds.WorldRegion;
 import net.runelite.http.api.worlds.WorldType;
 
 class WorldTableRow extends JPanel
@@ -57,12 +58,11 @@ class WorldTableRow extends JPanel
 	private static final int PING_COLUMN_WIDTH = 35;
 
 	private static final Color CURRENT_WORLD = new Color(66, 227, 17);
-	private static final Color UNAVAILABLE_WORLD = Color.GRAY.darker().darker();
 	private static final Color DANGEROUS_WORLD = new Color(251, 62, 62);
 	private static final Color TOURNAMENT_WORLD = new Color(79, 145, 255);
 	private static final Color MEMBERS_WORLD = new Color(210, 193, 53);
 	private static final Color FREE_WORLD = new Color(200, 200, 200);
-	private static final Color LEAGUE_WORLD = new Color(157, 237, 1);
+	private static final Color LEAGUE_WORLD = new Color(133, 177, 178);
 
 	static
 	{
@@ -78,7 +78,7 @@ class WorldTableRow extends JPanel
 	private JLabel playerCountField;
 	private JLabel activityField;
 	private JLabel pingField;
-	private BiConsumer<World, Boolean> onFavorite;
+	private final BiConsumer<World, Boolean> onFavorite;
 
 	@Getter
 	private final World world;
@@ -89,11 +89,9 @@ class WorldTableRow extends JPanel
 	private int ping;
 
 	private Color lastBackground;
-	private boolean current;
 
 	WorldTableRow(World world, boolean current, boolean favorite, Integer ping, Consumer<World> onSelect, BiConsumer<World, Boolean> onFavorite)
 	{
-		this.current = current;
 		this.world = world;
 		this.onFavorite = onFavorite;
 		this.updatedPlayerCount = world.getPlayers();
@@ -209,7 +207,12 @@ class WorldTableRow extends JPanel
 	void updatePlayerCount(int playerCount)
 	{
 		this.updatedPlayerCount = playerCount;
-		playerCountField.setText(String.valueOf(playerCount));
+		playerCountField.setText(playerCountString(playerCount));
+	}
+
+	private static String playerCountString(int playerCount)
+	{
+		return playerCount < 0 ? "OFF" : Integer.toString(playerCount);
 	}
 
 	void setPing(int ping)
@@ -274,7 +277,7 @@ class WorldTableRow extends JPanel
 		JPanel column = new JPanel(new BorderLayout());
 		column.setBorder(new EmptyBorder(0, 5, 0, 5));
 
-		playerCountField = new JLabel(world.getPlayers() + "");
+		playerCountField = new JLabel(playerCountString(world.getPlayers()));
 		playerCountField.setFont(FontManager.getRunescapeSmallFont());
 
 		column.add(playerCountField, BorderLayout.WEST);
@@ -326,26 +329,36 @@ class WorldTableRow extends JPanel
 
 		worldField = new JLabel(world.getId() + "");
 
-		JLabel flag = new JLabel(getFlag(world.getLocation()));
-
-		column.add(flag, BorderLayout.WEST);
+		ImageIcon flagIcon = getFlag(world.getRegion());
+		if (flagIcon != null)
+		{
+			JLabel flag = new JLabel(flagIcon);
+			column.add(flag, BorderLayout.WEST);
+		}
 		column.add(worldField, BorderLayout.CENTER);
 
 		return column;
 	}
 
-	private ImageIcon getFlag(int locationId)
+	private static ImageIcon getFlag(WorldRegion region)
 	{
-		switch (locationId)
+		if (region == null)
 		{
-			case 0:
+			return null;
+		}
+
+		switch (region)
+		{
+			case UNITED_STATES_OF_AMERICA:
 				return FLAG_US;
-			case 1:
+			case UNITED_KINGDOM:
 				return FLAG_UK;
-			case 3:
+			case AUSTRALIA:
 				return FLAG_AUS;
-			default:
+			case GERMANY:
 				return FLAG_GER;
+			default:
+				return null;
 		}
 	}
 }
