@@ -1,0 +1,7 @@
+General ideas.
+Create a new thread within this thread a looped function will routinely call (post to event bus) a custom subscribed method.
+The regularity of this subscribed event will allow for a time frame granularity more precise than the actual render time of the game itself.
+Because of this, we can then use plugins that LISTEN for this event and perform bot logic.
+This bot logic will likely listen to tiles, monsters, etc. It will then send out custom Mouse Events on the stack (gotta figure that out). 
+
+
