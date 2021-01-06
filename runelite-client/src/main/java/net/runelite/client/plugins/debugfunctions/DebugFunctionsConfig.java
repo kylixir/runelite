@@ -5,7 +5,8 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 
 @ConfigGroup("test")
-public interface DebugFunctionsConfig extends Config {
+public interface DebugFunctionsConfig extends Config
+{
 
     @ConfigItem(
             keyName = "clientTickDebug",
