@@ -260,11 +260,6 @@ public class RuneLite
 				ClassPreloader.preload();
 			}, "Preloader").start();
 
-			final RoutineEventPoster eventPoster = new RoutineEventPoster();
-
-			new Thread ( eventPoster, "Scheduler").start();
-
-
 			final boolean developerMode = options.has("developer-mode") && RuneLiteProperties.getLauncherVersion() == null;
 
 			if (developerMode)
@@ -329,6 +324,12 @@ public class RuneLite
 			// Inject members into client
 			injector.injectMembers(client);
 		}
+
+		final RoutineEventPoster eventPoster = new RoutineEventPoster();
+
+		injector.injectMembers(eventPoster);
+
+		new Thread ( eventPoster, "Scheduler").start();
 
 		SplashScreen.stage(.57, null, "Loading configuration");
 

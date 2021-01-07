@@ -3,6 +3,7 @@ package net.runelite.client.plugins.debugfunctions;
 import com.google.inject.Provides;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ScheduledEvent;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
@@ -37,6 +38,11 @@ public class DebugFunctionsPlugin extends Plugin
         if(config.showClientTickDebug()){
         System.out.println("Here is a client Tick");
         }
+    }
+
+    @Subscribe
+    public void onScheduledEvent(ScheduledEvent event){
+        System.out.println(event.getDeltaTime() + " SCH event woo");
     }
 
     @Override
