@@ -9,7 +9,6 @@ import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.api.events.ClientTick;
-import net.runelite.client.util.MouseEventBuilderUtil;
 
 import javax.inject.Inject;
 import java.awt.*;
@@ -35,8 +34,6 @@ public class DebugFunctionsPlugin extends Plugin
 
     @Inject
     private DebugFunctionsConfig config;
-
-    private MouseEventBuilderUtil bob;
 
     @Subscribe
     public void onClientTick(ClientTick clientTick){
