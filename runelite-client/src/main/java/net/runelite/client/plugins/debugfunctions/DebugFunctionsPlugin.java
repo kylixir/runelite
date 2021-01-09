@@ -9,7 +9,10 @@ import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.api.events.ClientTick;
+import net.runelite.client.util.MouseEventBuilderUtil;
+
 import javax.inject.Inject;
+import java.awt.*;
 
 
 @PluginDescriptor(
@@ -33,6 +36,8 @@ public class DebugFunctionsPlugin extends Plugin
     @Inject
     private DebugFunctionsConfig config;
 
+    private MouseEventBuilderUtil bob;
+
     @Subscribe
     public void onClientTick(ClientTick clientTick){
         if(config.showClientTickDebug()){
@@ -43,11 +48,13 @@ public class DebugFunctionsPlugin extends Plugin
     @Subscribe
     public void onScheduledEvent(ScheduledEvent event){
         System.out.println(event.getDeltaTime() + " SCH event woo");
+
     }
 
     @Override
     protected void startUp() throws Exception
     {
+        Component b = new Component(){};
         mouseManager.registerMouseListener(inputListener);
         keyManager.registerKeyListener(inputListener);
     }

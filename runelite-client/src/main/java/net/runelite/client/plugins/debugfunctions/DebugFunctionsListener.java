@@ -40,18 +40,17 @@ public class DebugFunctionsListener extends MouseAdapter implements KeyListener
     @Override
     public MouseEvent mouseMoved(MouseEvent e)
     {
+        if(e!=null){
+            int i = 4;
+        }
+
         if(config.showMousePosDebug()){
 
             long now = System.currentTimeMillis();
             long diff = now - lastMove;
             lastMove = now;
 
-            int truX = e.getX();
-            int truY= e.getY();
-            int absX = e.getXOnScreen();
-            int absY = e.getYOnScreen();
-            System.out.println("..X: " + truX + "   Y: " + truY +
-                       "   ScreenX: " + absX + "   ScreenY: " + absY + "   Time diff: " + diff);
+            System.out.println(e.toString());
         }
         return e;
     }
