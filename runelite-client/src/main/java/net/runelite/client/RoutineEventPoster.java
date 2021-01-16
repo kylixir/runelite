@@ -24,21 +24,13 @@ public class RoutineEventPoster implements Runnable {
 
         while(true){
             try {
-                Thread.sleep(500);
-                System.out.println("The separate tread is running.");
-
-                if(eventBus != null){ //NULL, GET INJECT WORKING
+                Thread.sleep(5000);
+                if(eventBus != null){
                     eventBus.post(SCHEDULED_EVENT);
                 }
-
-
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
-
-
     }
-
-
 }

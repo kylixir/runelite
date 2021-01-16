@@ -15,7 +15,7 @@ import java.awt.*;
 
 
 @PluginDescriptor(
-        name = "Test",
+        name = "Debugging",
         description = "For testing plugins",
         tags = {"dev", "development"},
         enabledByDefault = false
@@ -47,6 +47,8 @@ public class DebugFunctionsPlugin extends Plugin
         System.out.println(event.getDeltaTime() + " SCH event woo");
 
     }
+
+
 
     @Override
     protected void startUp() throws Exception
